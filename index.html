@@ -1053,84 +1053,26 @@ async function generatePlan() {
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// ── CLAUDE API CALL ────────────────────────────────────────────────────────
+// ── PLAN GENERATION — via Supabase Edge Function ──────────────────────────
 async function callClaude() {
-  const nights = state.nights ||
-    (state.arrival && state.departure
-      ? Math.max(1, Math.round((new Date(state.departure) - new Date(state.arrival)) / 86400000))
-      : 5);
-
-  const prompt = `You are Ginger Pelirroja, an expert travel advisor specializing in experiential travel.
-
-Build a detailed ${nights}-day trip plan for the following traveler:
-
-DESTINATION: ${state.destination}
-FLYING FROM: ${state.origin || 'unspecified'}
-DATES: ${state.arrival || 'flexible'} to ${state.departure || 'flexible'} (${nights} nights)
-GROUP: ${state.adults} adults, ${state.children} children — ${state.tripType}
-BUDGET: ${state.budget} (budget=<$100/day, mid=$100-250/day, comfort=$250-500/day, luxury=$500+/day per person)
-PACE: ${state.pace} (slow=2-3 activities/day, balanced=4-5, packed=6-7+)
-INTERESTS: ${state.interests.length ? state.interests.join(', ') : 'general travel'}
-SPECIAL NOTES: ${state.notes || 'none'}
-
-Respond ONLY with a JSON object in this exact format (no markdown, no preamble):
-{
-  "destination_display": "short destination name e.g. Tenerife",
-  "tagline": "one evocative line about this trip e.g. 'volcanic coasts, hidden villages, time to exhale'",
-  "nights": ${nights},
-  "savings": {
-    "est_savings_pct": "e.g. 35%",
-    "best_booking_window": "e.g. 6-8 weeks out",
-    "top_hack": "one specific money-saving tip for this destination"
-  },
-  "days": [
-    {
-      "day_num": 1,
-      "title": "evocative day title",
-      "tags": ["e.g. Arrival", "Coast", "Food"],
-      "timeline": [
-        {
-          "time": "e.g. 10:00",
-          "title": "Activity name",
-          "desc": "2-3 sentence description with specific details, real place names, practical tips",
-          "tip": "optional insider tip — specific, practical, not generic"
-        }
-      ]
-    }
-  ],
-  "ginger_notes": [
-    {
-      "icon": "emoji",
-      "text": "specific insider note — must be destination-specific and actionable, not generic"
-    }
-  ]
-}
-
-Rules:
-- Use REAL place names, real neighborhoods, real restaurants where you know them
-- Be specific and opinionated — this is Ginger's personal recommendation, not TripAdvisor
-- Match the budget level: budget travelers get street food + hostels + free hikes; luxury travelers get michelin picks + boutique hotels + private transfers
-- Match the pace: slow = generous downtime built in; packed = early starts, tight scheduling
-- Every day should feel distinct — no copy-paste structure
-- Ginger notes: 5-6 items, each with a specific actionable insight about this exact destination
-- Generate exactly ${Math.min(nights, 14)} days maximum — use ALL ${nights} nights if ${nights} <= 14, otherwise spread highlights across 14 days with a note that the plan covers key days`;
-
   try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        messages: [{ role: 'user', content: prompt }]
-      })
-    });
-    const data = await resp.json();
-    const text = data.content?.[0]?.text || '';
-    const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
+    const resp = await fetch(
+      'https://ugdaqdhthleyhvsubxis.supabase.co/functions/v1/trip-plan-generate',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ state })
+      }
+    );
+    if (!resp.ok) {
+      console.error('Edge function error:', resp.status, await resp.text());
+      return getFallbackPlan();
+    }
+    const plan = await resp.json();
+    if (plan.error) { console.error('Plan error:', plan.error); return getFallbackPlan(); }
+    return plan;
   } catch(e) {
-    console.warn('API error, using fallback plan', e);
+    console.warn('Plan generation failed, using fallback:', e);
     return getFallbackPlan();
   }
 }
@@ -1574,66 +1516,65 @@ const GingerAdvisor = {
 
     this._addMsg('ginger', destGreet);
 
-    // If ElevenLabs ConvAI SDK loaded, initialize voice
-    if (typeof ElevenLabsConvai !== 'undefined' && GA_AGENT_ID !== 'GINGER_ADVISOR_AGENT_ID') {
-      this._initVoice();
+    // Mount ElevenLabs ConvAI web component
+    if (GA_AGENT_ID && GA_AGENT_ID !== 'GINGER_ADVISOR_AGENT_ID') {
+      this._mountConvAI();
     } else {
-      // Text-only mode (agent ID not set yet or SDK not loaded)
-      this._addMsg('system', 'TEXT MODE · Voice available once agent is configured');
+      this._addMsg('system', 'TEXT MODE · Agent ID not configured');
     }
   },
 
-  async _initVoice() {
+  _mountConvAI() {
     try {
-      // Build dynamic variables to give Ginger trip context
-      const dynamicVars = {
-        destination:  window.state?.destination  || 'unknown',
-        arrival:      window.state?.arrival      || 'flexible',
-        departure:    window.state?.departure    || 'flexible',
-        adults:       window.state?.adults       || '2',
-        budget:       window.state?.budget       || 'mid',
-        interests:    (window.state?.interests || []).join(', ') || 'general travel',
-        pace:         window.state?.pace         || 'balanced',
-        buyer_email:  window._buyerEmail         || '',
+      // Build dynamic variables from trip state
+      const dynVars = {
+        destination: window.state?.destination || 'unknown',
+        arrival:     window.state?.arrival     || 'flexible',
+        departure:   window.state?.departure   || 'flexible',
+        adults:      String(window.state?.adults || '2'),
+        budget:      window.state?.budget      || 'mid',
+        interests:   (window.state?.interests  || []).join(', ') || 'general travel',
+        pace:        window.state?.pace        || 'balanced',
+        buyer_email: window._buyerEmail        || '',
       };
 
-      this.conv = await ElevenLabsConvai.startSession({
-        agentId: GA_AGENT_ID,
-        dynamicVariables,
-        onMessage: (msg) => {
-          if (msg.source === 'ai') {
-            this._removeTyping();
-            this._addMsg('ginger', msg.message);
-          }
-        },
-        onStatusChange: (status) => {
-          const statusEl = document.getElementById('ga-status');
-          const voiceBar = document.getElementById('ga-voice-bar');
-          if (status === 'listening') {
-            statusEl.textContent = '● Listening…';
-            voiceBar.classList.add('active');
-            document.getElementById('ga-mic-btn').classList.add('listening');
-          } else if (status === 'speaking') {
-            statusEl.textContent = '● Speaking…';
-            voiceBar.classList.add('active');
-            document.getElementById('ga-mic-btn').classList.remove('listening');
-          } else {
-            statusEl.textContent = '● Trip Advisor · Online';
-            voiceBar.classList.remove('active');
-            document.getElementById('ga-mic-btn').classList.remove('listening');
-          }
-        },
-        onError: (err) => {
-          console.warn('ElevenLabs ConvAI error:', err);
-          this._addMsg('system', 'Voice unavailable · use text below');
-        }
-      });
+      // Create the ElevenLabs ConvAI web component
+      const widget = document.createElement('elevenlabs-convai');
+      widget.setAttribute('agent-id', GA_AGENT_ID);
 
+      // Pass dynamic variables as JSON attribute
+      widget.setAttribute('dynamic-variables', JSON.stringify(dynVars));
+
+      // Style it to fit inside our panel
+      widget.style.cssText = 'width:100%;display:block;';
+
+      // Replace our custom messages+input with the ElevenLabs widget
+      const msgs    = document.getElementById('ga-messages');
+      const voiceBar = document.getElementById('ga-voice-bar');
+      const inputRow = document.getElementById('ga-input-row');
+
+      // Hide our custom UI elements — widget has its own
+      msgs.style.display     = 'none';
+      voiceBar.style.display = 'none';
+      inputRow.style.display = 'none';
+
+      // Insert widget between context and disclaimer
+      const disclaimer = document.getElementById('ga-disclaimer');
+      disclaimer.parentElement.insertBefore(widget, disclaimer);
+
+      // Update status
       document.getElementById('ga-status').textContent = '● Voice ready';
+      console.log('ElevenLabs ConvAI mounted with vars:', dynVars);
     } catch(e) {
-      console.warn('ConvAI init failed:', e);
+      console.warn('ConvAI mount failed, falling back to text:', e);
+      this._addMsg('system', 'Voice unavailable · use text below');
+      // Re-show text UI
+      document.getElementById('ga-messages').style.display = 'flex';
+      document.getElementById('ga-input-row').style.display  = 'flex';
     }
   },
+
+  async send
 
   async send() {
     const input = document.getElementById('ga-text-input');
@@ -1666,19 +1607,18 @@ Their trip context: destination=${dest}, arrival=${window.state?.arrival||'?'},
 adults=${window.state?.adults||'2'}, budget=${window.state?.budget||'mid'}, 
 interests=${(window.state?.interests||[]).join(', ')||'general'}, pace=${window.state?.pace||'balanced'}.`;
 
-      const resp = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: text }]
-        })
-      });
+      const resp = await fetch(
+        'https://ugdaqdhthleyhvsubxis.supabase.co/functions/v1/trip-plan-generate',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: window.state, question: text })
+        }
+      );
       const data = await resp.json();
       this._removeTyping();
-      this._addMsg('ginger', data.content?.[0]?.text || "I'm having trouble connecting right now. Try again in a moment.");
+      // If it's a plan object (wrong endpoint), fall back gracefully
+      this._addMsg('ginger', data.answer || data.content?.[0]?.text || "Let me look into that. Try asking again in a moment.");
     } catch(e) {
       this._removeTyping();
       this._addMsg('ginger', "Something went wrong on my end. Try asking again.");
