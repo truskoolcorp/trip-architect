@@ -940,6 +940,14 @@ function nextStep(from) {
     state.departure   = document.getElementById('departure').value;
     state.origin      = document.getElementById('origin').value.trim();
     if (!state.destination) { alert('Please enter a destination.'); return; }
+    // Calculate nights from dates
+    if (state.arrival && state.departure) {
+      state.nights = Math.max(1, Math.round(
+        (new Date(state.departure) - new Date(state.arrival)) / 86400000
+      ));
+    } else {
+      state.nights = 5; // default if dates not set
+    }
   }
   if (from === 2) {
     state.adults   = document.getElementById('adults').value;
@@ -1047,9 +1055,10 @@ function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── CLAUDE API CALL ────────────────────────────────────────────────────────
 async function callClaude() {
-  const nights = state.arrival && state.departure
-    ? Math.max(1, Math.round((new Date(state.departure) - new Date(state.arrival)) / 86400000))
-    : 5;
+  const nights = state.nights ||
+    (state.arrival && state.departure
+      ? Math.max(1, Math.round((new Date(state.departure) - new Date(state.arrival)) / 86400000))
+      : 5);
 
   const prompt = `You are Ginger Pelirroja, an expert travel advisor specializing in experiential travel.
 
@@ -1104,7 +1113,7 @@ Rules:
 - Match the pace: slow = generous downtime built in; packed = early starts, tight scheduling
 - Every day should feel distinct — no copy-paste structure
 - Ginger notes: 5-6 items, each with a specific actionable insight about this exact destination
-- Generate exactly ${Math.min(nights, 7)} days (cap at 7 for readability)`;
+- Generate exactly ${Math.min(nights, 14)} days maximum — use ALL ${nights} nights if ${nights} <= 14, otherwise spread highlights across 14 days with a note that the plan covers key days`;
 
   try {
     const resp = await fetch('https://api.anthropic.com/v1/messages', {
@@ -1128,17 +1137,20 @@ Rules:
 
 // ── RENDER OUTPUT ──────────────────────────────────────────────────────────
 function renderOutput(plan) {
-  const nights = plan.nights || state.nights || 5;
+  const nights = state.nights || plan.nights || 5;
 
   // Title
   document.getElementById('output-title').innerHTML =
     `Your <em>${plan.destination_display || state.destination}</em><br>plan is ready.`;
 
   // Tagline + meta
+  const actualNights = state.nights || nights;
+  const nightsLabel = actualNights === 1 ? '1 night' : `${actualNights} nights`;
+  const travellerLabel = parseInt(state.adults) === 1 ? '1 traveller' : `${state.adults} travellers`;
   document.getElementById('output-meta').innerHTML = `
     <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:var(--terr-lt);margin-bottom:12px;">"${plan.tagline || ''}"</div>
-    <div>${nights} nights · ${state.adults} travellers</div>
-    <div>${state.arrival || 'Flexible dates'}</div>
+    <div>${nightsLabel} · ${travellerLabel}</div>
+    <div>${state.arrival ? state.arrival + ' → ' + (state.departure || '?') : 'Flexible dates'}</div>
   `;
 
   // Savings bar
@@ -1204,7 +1216,7 @@ function getFallbackPlan() {
   return {
     destination_display: state.destination || "Your Destination",
     tagline: "A trip built around you, not a template",
-    nights: 5,
+    nights: state?.nights || 5,
     savings: {
       est_savings_pct: "30–40%",
       best_booking_window: "6–8 weeks out",
