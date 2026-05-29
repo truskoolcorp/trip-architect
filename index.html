@@ -807,13 +807,106 @@
 </div><!-- /wrap -->
 
 <script>
+
+// ── TOKEN GATE ─────────────────────────────────────────────────────────────
+const SUPABASE_URL  = 'https://ugdaqdhthleyhvsubxis.supabase.co';
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnZGFxZGh0aGxleWh2c3VieGlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzI1ODUsImV4cCI6MjA4NTc0ODU4NX0.VlHoUXozjiDZYS7-d9n_cdGMsJKB61rPK-2d9tHQtV4';
+
+const urlToken = new URLSearchParams(location.search).get('t');
+const DEMO_MODE = !urlToken || urlToken === 'demo';
+
+async function validateToken(t) {
+  if (DEMO_MODE) return { valid: true, demo: true, email: null, expires_at: null };
+  try {
+    const res = await fetch(
+      `${SUPABASE_URL}/rest/v1/architect_sessions?token=eq.${encodeURIComponent(t)}&select=id,email,expires_at,status,use_count`,
+      { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` } }
+    );
+    const rows = await res.json();
+    if (!rows || rows.length === 0) return { valid: false };
+    const row = rows[0];
+    if (row.status !== 'active') return { valid: false, reason: 'expired' };
+    if (new Date(row.expires_at) < new Date()) return { valid: false, reason: 'expired' };
+    return { valid: true, demo: false, email: row.email, expires_at: row.expires_at, id: row.id };
+  } catch(e) {
+    console.warn('Token validation error:', e);
+    return { valid: true, demo: true }; // fail open so network issues don't break access
+  }
+}
+
+async function trackUsage(sessionId) {
+  if (!sessionId) return;
+  await fetch(
+    `${SUPABASE_URL}/rest/v1/architect_sessions?id=eq.${sessionId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'apikey': SUPABASE_ANON,
+        'Authorization': `Bearer ${SUPABASE_ANON}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=minimal'
+      },
+      body: JSON.stringify({ last_used_at: new Date().toISOString(), use_count: undefined })
+    }
+  );
+}
+
+function showGate(reason) {
+  document.body.innerHTML = `
+    <div style="min-height:100vh;background:#1A1410;display:flex;align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;padding:24px;">
+      <div style="max-width:480px;text-align:center;">
+        <div style="font-family:'Cormorant Garamond',serif;font-size:13px;letter-spacing:0.2em;text-transform:uppercase;color:#C47135;margin-bottom:24px;">Dallasite on Tour · Trip Architect</div>
+        <h1 style="font-family:'Cormorant Garamond',serif;font-size:42px;font-weight:300;color:#F5EFE6;line-height:1.1;margin-bottom:16px;">
+          ${reason === 'expired' ? 'Your access<br><em style="font-style:italic;color:#E8A06A;">has expired.</em>' : 'Access<br><em style="font-style:italic;color:#E8A06A;">required.</em>'}
+        </h1>
+        <p style="color:#7A6B5E;font-size:15px;line-height:1.7;margin-bottom:32px;">
+          ${reason === 'expired'
+            ? 'Your 30-day Trip Architect access has ended. Purchase again to build a new plan.'
+            : 'This experience is included with the $97 Trip Architect purchase. Your personalised access link is in your confirmation email.'}
+        </p>
+        <a href="https://dallasiteontour.org" style="display:inline-block;background:#C47135;color:#1A1410;font-size:14px;font-weight:500;padding:13px 28px;border-radius:3px;text-decoration:none;margin-right:10px;">
+          Get Trip Architect →
+        </a>
+        <a href="https://dallasiteontour.org" style="display:inline-block;border:1px solid rgba(196,113,53,0.3);color:#7A6B5E;font-size:14px;padding:13px 28px;border-radius:3px;text-decoration:none;">
+          Back to site
+        </a>
+      </div>
+    </div>`;
+}
+
+function showDemoBanner(daysLeft) {
+  if (!DEMO_MODE && daysLeft) {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:rgba(196,113,53,0.12);border-bottom:1px solid rgba(196,113,53,0.2);padding:10px 24px;display:flex;justify-content:space-between;align-items:center;font-family:DM Mono,monospace;font-size:11px;letter-spacing:0.1em;color:#C47135;';
+    bar.innerHTML = `<span>TRIP ARCHITECT · ACTIVE ACCESS</span><span>${daysLeft} DAYS REMAINING</span>`;
+    document.body.prepend(bar);
+    document.body.style.paddingTop = '41px';
+  }
+}
+
+// Run gate on load
+(async () => {
+  const result = await validateToken(urlToken);
+  if (!result.valid) {
+    showGate(result.reason || 'no_token');
+    return;
+  }
+  if (!result.demo && result.expires_at) {
+    const daysLeft = Math.ceil((new Date(result.expires_at) - new Date()) / 86400000);
+    showDemoBanner(daysLeft);
+    trackUsage(result.id);
+  }
+  // Make buyer email available to the app
+  window._buyerEmail = result.email;
+})();
+
 // ── STATE ──────────────────────────────────────────────────────────────────
 const state = {
   step: 1,
   destination: '', origin: '', arrival: '', departure: '',
   adults: '2', children: '0', tripType: 'leisure', budget: 'mid',
   interests: [], notes: '', pace: 'balanced',
-  token: new URLSearchParams(location.search).get('t') || 'demo'
+  token: urlToken || 'demo'
 };
 
 const TOTAL_STEPS = 5;
