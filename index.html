@@ -1,0 +1,1170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trip Architect · Dallasite on Tour</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@300;400&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --sand:     #F5EFE6;
+    --parch:    #EDE4D7;
+    --terr:     #C47135;
+    --terr-dk:  #9E5420;
+    --terr-lt:  #E8A06A;
+    --ink:      #1A1410;
+    --ink-soft: #2E2520;
+    --muted:    #7A6B5E;
+    --line:     rgba(196,113,53,0.18);
+    --glass:    rgba(245,239,230,0.06);
+    --glow:     rgba(196,113,53,0.15);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--ink);
+    color: var(--sand);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 300;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── GRAIN OVERLAY ── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.35;
+  }
+
+  /* ── LAYOUT ── */
+  .wrap { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: 0 24px; }
+
+  /* ── HEADER ── */
+  header {
+    padding: 36px 0 0;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 15px; letter-spacing: 0.22em; text-transform: uppercase;
+    color: var(--terr-lt); font-weight: 400;
+  }
+  .logo span { color: var(--muted); }
+
+  /* ── HERO ── */
+  .hero {
+    padding: 72px 0 56px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: end;
+  }
+  .hero-left {}
+  .hero-eyebrow {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--terr); margin-bottom: 20px;
+  }
+  .hero-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(42px, 6vw, 64px); font-weight: 300; line-height: 1.05;
+    letter-spacing: -0.01em;
+  }
+  .hero-title em { font-style: italic; color: var(--terr-lt); }
+  .hero-sub {
+    margin-top: 24px; font-size: 15px; line-height: 1.7;
+    color: var(--muted); max-width: 380px;
+  }
+  .hero-right {
+    position: relative;
+  }
+  .ginger-portrait {
+    width: 100%; aspect-ratio: 3/4;
+    background: linear-gradient(160deg, #2a1f18 0%, #1A1410 100%);
+    border-radius: 4px; overflow: hidden;
+    border: 1px solid var(--line);
+    position: relative;
+  }
+  .ginger-portrait img {
+    width: 100%; height: 100%; object-fit: cover; opacity: 0.88;
+    transition: opacity 0.4s;
+  }
+  .ginger-portrait::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(to top, var(--ink) 0%, transparent 40%);
+  }
+  .portrait-caption {
+    position: absolute; bottom: 20px; left: 20px; z-index: 2;
+    font-family: 'Cormorant Garamond', serif; font-style: italic;
+    font-size: 14px; color: var(--parch); opacity: 0.7;
+  }
+
+  /* ── DIVIDER ── */
+  .divider {
+    border: none; border-top: 1px solid var(--line); margin: 0;
+  }
+
+  /* ── WIZARD ── */
+  #wizard { padding: 64px 0 80px; }
+
+  .step {
+    display: none;
+    animation: fadeUp 0.45s ease both;
+  }
+  .step.active { display: block; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(18px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .step-header {
+    display: flex; align-items: flex-start; gap: 24px; margin-bottom: 44px;
+  }
+  .step-num {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--terr); letter-spacing: 0.14em;
+    padding-top: 6px; flex-shrink: 0;
+  }
+  .step-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(28px, 4vw, 40px); font-weight: 300; line-height: 1.1;
+  }
+  .step-title em { font-style: italic; color: var(--terr-lt); }
+
+  /* ── FORM ELEMENTS ── */
+  .fields { display: grid; gap: 24px; }
+  .fields-2col { grid-template-columns: 1fr 1fr; }
+  .fields-3col { grid-template-columns: 1fr 1fr 1fr; }
+
+  .field label {
+    display: block; font-family: 'DM Mono', monospace;
+    font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 10px;
+  }
+
+  .field input, .field select, .field textarea {
+    width: 100%; background: var(--glass);
+    border: 1px solid var(--line); border-radius: 3px;
+    color: var(--sand); font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 300; padding: 14px 16px;
+    transition: border-color 0.2s, background 0.2s;
+    -webkit-appearance: none; appearance: none;
+  }
+  .field input::placeholder, .field textarea::placeholder { color: var(--muted); opacity: 0.6; }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--terr); background: rgba(196,113,53,0.07);
+  }
+  .field select { cursor: pointer; }
+  .field select option { background: var(--ink-soft); color: var(--sand); }
+  .field textarea { resize: vertical; min-height: 100px; line-height: 1.6; }
+
+  /* ── CHIP SELECTORS ── */
+  .chips { display: flex; flex-wrap: wrap; gap: 10px; }
+  .chip {
+    padding: 9px 18px; border: 1px solid var(--line); border-radius: 100px;
+    font-size: 13px; font-weight: 400; color: var(--muted);
+    cursor: pointer; transition: all 0.18s; background: transparent;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .chip:hover { border-color: var(--terr); color: var(--terr-lt); }
+  .chip.selected {
+    background: var(--terr); border-color: var(--terr);
+    color: var(--ink); font-weight: 500;
+  }
+
+  /* ── PACE CARDS ── */
+  .pace-cards { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; }
+  .pace-card {
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 20px; cursor: pointer; transition: all 0.2s;
+    background: transparent; text-align: left;
+    font-family: 'DM Sans', sans-serif;
+  }
+  .pace-card:hover { border-color: var(--terr); background: var(--glass); }
+  .pace-card.selected { border-color: var(--terr); background: rgba(196,113,53,0.09); }
+  .pace-card-icon { font-size: 22px; margin-bottom: 10px; }
+  .pace-card-title { font-size: 14px; font-weight: 500; color: var(--sand); margin-bottom: 4px; }
+  .pace-card-desc { font-size: 12px; color: var(--muted); line-height: 1.5; }
+
+  /* ── GINGER COMMENTARY ── */
+  .ginger-aside {
+    display: flex; gap: 16px; align-items: flex-start;
+    background: rgba(196,113,53,0.06); border: 1px solid var(--line);
+    border-left: 3px solid var(--terr);
+    border-radius: 0 4px 4px 0; padding: 18px 20px;
+    margin-top: 32px;
+  }
+  .ginger-aside-avatar {
+    width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+    overflow: hidden; border: 1px solid var(--terr);
+  }
+  .ginger-aside-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ginger-aside-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 16px; font-style: italic; line-height: 1.65; color: var(--parch);
+  }
+  .ginger-aside-text strong { font-style: normal; font-size: 11px; font-family: 'DM Mono', monospace; color: var(--terr); letter-spacing: 0.12em; display: block; margin-bottom: 6px; }
+
+  /* ── NAV BUTTONS ── */
+  .step-nav {
+    display: flex; justify-content: space-between; align-items: center;
+    margin-top: 48px;
+  }
+  .btn {
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500;
+    letter-spacing: 0.04em; padding: 13px 28px; border-radius: 3px;
+    cursor: pointer; transition: all 0.2s; border: none;
+  }
+  .btn-primary {
+    background: var(--terr); color: var(--ink);
+  }
+  .btn-primary:hover { background: var(--terr-lt); }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--line);
+  }
+  .btn-ghost:hover { color: var(--sand); border-color: var(--muted); }
+
+  /* ── PROGRESS BAR ── */
+  .progress-bar {
+    height: 2px; background: rgba(196,113,53,0.15);
+    margin-bottom: 52px; border-radius: 2px; overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%; background: var(--terr);
+    transition: width 0.5s cubic-bezier(0.4,0,0.2,1);
+    border-radius: 2px;
+  }
+
+  /* ── STEP INDICATORS ── */
+  .step-dots {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .step-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--line); transition: all 0.3s;
+  }
+  .step-dot.done { background: var(--terr-dk); }
+  .step-dot.active { background: var(--terr); width: 18px; border-radius: 3px; }
+
+  /* ── GENERATING ── */
+  #generating {
+    display: none; padding: 64px 0 80px; text-align: center;
+  }
+  #generating.active { display: block; }
+
+  .gen-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(32px, 5vw, 52px); font-weight: 300; margin-bottom: 16px;
+  }
+  .gen-sub { color: var(--muted); font-size: 15px; margin-bottom: 48px; }
+
+  .gen-ginger {
+    width: 120px; height: 120px; border-radius: 50%; overflow: hidden;
+    margin: 0 auto 32px; border: 2px solid var(--terr);
+    position: relative;
+  }
+  .gen-ginger::after {
+    content: ''; position: absolute; inset: -4px;
+    border-radius: 50%; border: 2px solid var(--terr);
+    animation: pulse-ring 2s ease infinite; opacity: 0;
+  }
+  @keyframes pulse-ring {
+    0%   { transform: scale(1); opacity: 0.6; }
+    100% { transform: scale(1.4); opacity: 0; }
+  }
+  .gen-ginger img { width: 100%; height: 100%; object-fit: cover; }
+
+  .gen-log {
+    max-width: 480px; margin: 0 auto;
+    font-family: 'DM Mono', monospace; font-size: 12px;
+    color: var(--muted); text-align: left;
+    border: 1px solid var(--line); border-radius: 4px;
+    padding: 20px 24px; background: var(--glass);
+  }
+  .gen-log-line {
+    line-height: 2; opacity: 0;
+    animation: logFade 0.4s ease forwards;
+  }
+  .gen-log-line.done { color: var(--terr-lt); }
+  @keyframes logFade {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  /* ── ITINERARY OUTPUT ── */
+  #output {
+    display: none; padding: 64px 0 100px;
+  }
+  #output.active { display: block; }
+
+  .output-header {
+    display: grid; grid-template-columns: 1fr auto;
+    gap: 32px; align-items: start; margin-bottom: 52px;
+  }
+  .output-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: clamp(36px, 5.5vw, 58px); font-weight: 300; line-height: 1.05;
+  }
+  .output-title em { font-style: italic; color: var(--terr-lt); }
+  .output-meta {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--muted); line-height: 2; text-align: right;
+  }
+
+  /* Day cards */
+  .day-cards { display: grid; gap: 2px; margin-bottom: 48px; }
+  .day-card {
+    border: 1px solid var(--line); border-radius: 4px;
+    overflow: hidden; cursor: pointer;
+    transition: border-color 0.2s;
+  }
+  .day-card:hover { border-color: var(--terr); }
+  .day-card.open { border-color: var(--terr); }
+
+  .day-card-header {
+    display: flex; align-items: center; gap: 20px;
+    padding: 18px 24px; background: var(--glass);
+    transition: background 0.2s;
+  }
+  .day-card.open .day-card-header { background: rgba(196,113,53,0.08); }
+
+  .day-num {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.14em; color: var(--terr); flex-shrink: 0;
+  }
+  .day-label {
+    font-family: 'Cormorant Garamond', serif; font-size: 20px; font-weight: 400; flex: 1;
+  }
+  .day-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+  .day-tag {
+    font-size: 11px; padding: 3px 10px; border-radius: 100px;
+    border: 1px solid var(--line); color: var(--muted);
+  }
+  .day-chevron {
+    color: var(--muted); transition: transform 0.3s; font-size: 12px;
+  }
+  .day-card.open .day-chevron { transform: rotate(180deg); }
+
+  .day-card-body {
+    display: none; padding: 24px 24px 28px; border-top: 1px solid var(--line);
+  }
+  .day-card.open .day-card-body { display: block; }
+
+  .day-timeline { display: grid; gap: 16px; }
+  .tl-item { display: flex; gap: 16px; }
+  .tl-time {
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    color: var(--terr); min-width: 52px; padding-top: 2px;
+    flex-shrink: 0;
+  }
+  .tl-content {}
+  .tl-title { font-size: 14px; font-weight: 500; color: var(--sand); margin-bottom: 3px; }
+  .tl-desc { font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .tl-tip {
+    display: inline-block; margin-top: 6px; font-size: 12px;
+    color: var(--terr-lt); font-style: italic;
+  }
+
+  /* ── GINGER NOTES SECTION ── */
+  .ginger-notes {
+    background: rgba(196,113,53,0.05); border: 1px solid var(--line);
+    border-radius: 4px; padding: 32px; margin-bottom: 48px;
+  }
+  .ginger-notes-header {
+    display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+  }
+  .ginger-notes-avatar {
+    width: 44px; height: 44px; border-radius: 50%;
+    overflow: hidden; border: 2px solid var(--terr); flex-shrink: 0;
+  }
+  .ginger-notes-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .ginger-notes-label {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.16em; text-transform: uppercase; color: var(--terr);
+  }
+  .ginger-notes-name {
+    font-family: 'Cormorant Garamond', serif; font-size: 18px; color: var(--parch);
+  }
+  .note-list { display: grid; gap: 16px; }
+  .note-item { display: flex; gap: 14px; }
+  .note-icon { font-size: 16px; flex-shrink: 0; padding-top: 1px; }
+  .note-text { font-size: 14px; line-height: 1.65; color: var(--muted); }
+  .note-text strong { color: var(--sand); font-weight: 500; }
+
+  /* ── SAVINGS SUMMARY ── */
+  .savings-bar {
+    display: flex; gap: 2px; margin-bottom: 48px;
+  }
+  .savings-cell {
+    flex: 1; background: var(--glass); border: 1px solid var(--line);
+    border-radius: 3px; padding: 20px 16px; text-align: center;
+  }
+  .savings-val {
+    font-family: 'Cormorant Garamond', serif; font-size: 28px;
+    font-weight: 300; color: var(--terr-lt); display: block; margin-bottom: 4px;
+  }
+  .savings-lbl { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; }
+
+  /* ── CTA / ADVISOR BLOCK ── */
+  .advisor-cta {
+    border: 1px solid var(--terr); border-radius: 4px; padding: 36px;
+    background: linear-gradient(135deg, rgba(196,113,53,0.08) 0%, transparent 100%);
+    display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center;
+  }
+  .advisor-cta-title {
+    font-family: 'Cormorant Garamond', serif; font-size: 26px;
+    font-weight: 300; margin-bottom: 10px; line-height: 1.2;
+  }
+  .advisor-cta-sub { font-size: 14px; color: var(--muted); line-height: 1.6; }
+  .advisor-days {
+    text-align: center; flex-shrink: 0;
+  }
+  .advisor-days-num {
+    font-family: 'Cormorant Garamond', serif; font-size: 52px;
+    font-weight: 300; color: var(--terr-lt); line-height: 1; display: block;
+  }
+  .advisor-days-lbl { font-size: 11px; color: var(--muted); font-family: 'DM Mono', monospace; letter-spacing: 0.1em; }
+
+  /* ── FOOTER ── */
+  footer {
+    border-top: 1px solid var(--line); padding: 32px 0 48px;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .footer-logo {
+    font-family: 'Cormorant Garamond', serif; font-size: 13px;
+    color: var(--muted); letter-spacing: 0.12em;
+  }
+  .footer-note { font-size: 12px; color: var(--muted); opacity: 0.6; }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 640px) {
+    .hero { grid-template-columns: 1fr; gap: 36px; padding: 48px 0 40px; }
+    .hero-right { order: -1; max-width: 220px; }
+    .fields-2col, .fields-3col { grid-template-columns: 1fr; }
+    .pace-cards { grid-template-columns: 1fr; }
+    .output-header { grid-template-columns: 1fr; }
+    .output-meta { text-align: left; }
+    .advisor-cta { grid-template-columns: 1fr; }
+    .savings-bar { flex-direction: column; }
+    footer { flex-direction: column; gap: 12px; text-align: center; }
+  }
+</style>
+</head>
+
+<body>
+
+<div class="wrap">
+
+  <!-- HEADER -->
+  <header>
+    <div class="logo">Dallasite <span>on</span> Tour · <span>Trip Architect</span></div>
+    <div style="font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:0.1em;">$97 ADVISOR</div>
+  </header>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-left">
+      <div class="hero-eyebrow">Your plan. Built by Ginger.</div>
+      <h1 class="hero-title">
+        Not a guide.<br>
+        A <em>plan built<br>around you.</em>
+      </h1>
+      <p class="hero-sub">
+        Tell Ginger where you're going, who you're bringing, and what you actually want.
+        She builds your day-by-day — then stays available for 30 days to answer every question before you land.
+      </p>
+    </div>
+    <div class="hero-right">
+      <div class="ginger-portrait">
+        <img src="https://ugdaqdhthleyhvsubxis.supabase.co/storage/v1/object/public/ginger-clips/ginger/widget/greeting.mp4"
+             id="hero-img"
+             onerror="this.src='https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80'"
+             alt="Ginger Pelirroja">
+        <div class="portrait-caption">Ginger Pelirroja · AI travel advisor</div>
+      </div>
+    </div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- WIZARD -->
+  <section id="wizard">
+
+    <!-- Progress -->
+    <div class="progress-bar">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+
+    <!-- Step 1 — Destination + Dates -->
+    <div class="step active" id="step-1">
+      <div class="step-header">
+        <div class="step-num">01 / 05</div>
+        <h2 class="step-title">Where are you<br><em>headed?</em></h2>
+      </div>
+      <div class="fields">
+        <div class="field">
+          <label>Destination</label>
+          <input type="text" id="destination" placeholder="e.g. Tenerife, Canary Islands · Kyoto, Japan · Lisbon, Portugal" />
+        </div>
+        <div class="fields fields-2col">
+          <div class="field">
+            <label>Arrival date</label>
+            <input type="date" id="arrival" />
+          </div>
+          <div class="field">
+            <label>Departure date</label>
+            <input type="date" id="departure" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Where are you flying from?</label>
+          <input type="text" id="origin" placeholder="Dallas, TX · London, UK · New York, NY" />
+        </div>
+      </div>
+      <div class="ginger-aside">
+        <div class="ginger-aside-avatar">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&q=80" alt="Ginger" />
+        </div>
+        <div class="ginger-aside-text">
+          <strong>Ginger says</strong>
+          "Don't worry if your dates aren't locked yet — give me your best window and I'll build around it. You can always ask me to adjust later."
+        </div>
+      </div>
+      <div class="step-nav">
+        <div class="step-dots">
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+        </div>
+        <button class="btn btn-primary" onclick="nextStep(1)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 2 — Group -->
+    <div class="step" id="step-2">
+      <div class="step-header">
+        <div class="step-num">02 / 05</div>
+        <h2 class="step-title">Who's<br><em>coming with you?</em></h2>
+      </div>
+      <div class="fields">
+        <div class="fields fields-3col">
+          <div class="field">
+            <label>Adults</label>
+            <select id="adults">
+              <option value="1">1 — Solo</option>
+              <option value="2" selected>2 — Couple / friends</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6+">6+</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Children</label>
+            <select id="children">
+              <option value="0" selected>None</option>
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3+">3+</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Trip type</label>
+            <select id="trip-type">
+              <option value="leisure">Leisure / vacation</option>
+              <option value="romantic">Romantic / anniversary</option>
+              <option value="family">Family</option>
+              <option value="group-friends">Group of friends</option>
+              <option value="solo-adventure">Solo adventure</option>
+              <option value="digital-nomad">Digital nomad / remote work</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Daily budget per person (USD approximate)</label>
+          <select id="budget">
+            <option value="budget">Under $100/day — budget conscious</option>
+            <option value="mid" selected>$100–$250/day — mid-range</option>
+            <option value="comfort">$250–$500/day — comfort first</option>
+            <option value="luxury">$500+/day — luxury, no compromise</option>
+          </select>
+        </div>
+      </div>
+      <div class="ginger-aside">
+        <div class="ginger-aside-avatar">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&q=80" alt="Ginger" />
+        </div>
+        <div class="ginger-aside-text">
+          <strong>Ginger says</strong>
+          "Budget tells me more than anything. I'm not here to judge — I'm here to make sure every dollar works twice as hard as it usually does."
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="prevStep(2)">← Back</button>
+        <div class="step-dots">
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+        </div>
+        <button class="btn btn-primary" onclick="nextStep(2)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 3 — Interests -->
+    <div class="step" id="step-3">
+      <div class="step-header">
+        <div class="step-num">03 / 05</div>
+        <h2 class="step-title">What makes a trip<br><em>worth it for you?</em></h2>
+      </div>
+      <div class="field" style="margin-bottom:28px">
+        <label>Pick everything that applies</label>
+        <div class="chips" id="interest-chips">
+          <button class="chip" data-val="food">🍽 Exceptional food</button>
+          <button class="chip" data-val="beaches">🏖 Beaches & coast</button>
+          <button class="chip" data-val="hiking">⛰ Hiking & nature</button>
+          <button class="chip" data-val="culture">🏛 Culture & history</button>
+          <button class="chip" data-val="nightlife">🌙 Nightlife & music</button>
+          <button class="chip" data-val="photography">📷 Photography</button>
+          <button class="chip" data-val="wellness">🧘 Wellness & spa</button>
+          <button class="chip" data-val="shopping">🛍 Shopping & markets</button>
+          <button class="chip" data-val="adventure">🪂 Adventure sports</button>
+          <button class="chip" data-val="wine">🍷 Wine & craft drinks</button>
+          <button class="chip" data-val="local">🤝 Off-the-beaten-path</button>
+          <button class="chip" data-val="luxury-stays">🏨 Extraordinary stays</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Anything Ginger should know? (dietary needs, mobility, must-sees, deal-breakers)</label>
+        <textarea id="special-notes" placeholder="e.g. vegetarian, scared of heights, must see the sunset from somewhere dramatic, no all-inclusives…"></textarea>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="prevStep(3)">← Back</button>
+        <div class="step-dots">
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+          <div class="step-dot"></div>
+        </div>
+        <button class="btn btn-primary" onclick="nextStep(3)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 4 — Pace -->
+    <div class="step" id="step-4">
+      <div class="step-header">
+        <div class="step-num">04 / 05</div>
+        <h2 class="step-title">What's your<br><em>travel pace?</em></h2>
+      </div>
+      <div class="pace-cards">
+        <button class="pace-card" data-pace="slow" onclick="selectPace(this)">
+          <div class="pace-card-icon">🌿</div>
+          <div class="pace-card-title">Slow & deep</div>
+          <div class="pace-card-desc">2–3 things per day. Long lunches. Getting lost on purpose. No rushing.</div>
+        </button>
+        <button class="pace-card selected" data-pace="balanced" onclick="selectPace(this)">
+          <div class="pace-card-icon">⚖️</div>
+          <div class="pace-card-title">Balanced</div>
+          <div class="pace-card-desc">Mornings active, afternoons flexible. See the highlights without the hustle.</div>
+        </button>
+        <button class="pace-card" data-pace="packed" onclick="selectPace(this)">
+          <div class="pace-card-icon">⚡</div>
+          <div class="pace-card-title">Full send</div>
+          <div class="pace-card-desc">Every hour accounted for. I'll sleep when I'm home. Maximize everything.</div>
+        </button>
+      </div>
+      <div class="ginger-aside" style="margin-top:28px">
+        <div class="ginger-aside-avatar">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&q=80" alt="Ginger" />
+        </div>
+        <div class="ginger-aside-text">
+          <strong>Ginger says</strong>
+          "Most people say balanced — then I pack in one extra sunset or one early market and they thank me for it. Just saying."
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="prevStep(4)">← Back</button>
+        <div class="step-dots">
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+          <div class="step-dot"></div>
+        </div>
+        <button class="btn btn-primary" onclick="nextStep(4)">Continue →</button>
+      </div>
+    </div>
+
+    <!-- Step 5 — Confirm -->
+    <div class="step" id="step-5">
+      <div class="step-header">
+        <div class="step-num">05 / 05</div>
+        <h2 class="step-title">Ginger's got<br><em>everything she needs.</em></h2>
+      </div>
+      <div id="summary-block" style="border:1px solid var(--line);border-radius:4px;padding:28px;background:var(--glass);margin-bottom:32px;">
+        <!-- Filled by JS -->
+      </div>
+      <div class="ginger-aside">
+        <div class="ginger-aside-avatar">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=80&q=80" alt="Ginger" />
+        </div>
+        <div class="ginger-aside-text">
+          <strong>Ginger says</strong>
+          "This is where it gets good. Hit that button and I'll build your trip. You'll have a real plan — not a list — in about 30 seconds."
+        </div>
+      </div>
+      <div class="step-nav">
+        <button class="btn btn-ghost" onclick="prevStep(5)">← Back</button>
+        <div class="step-dots">
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot done"></div>
+          <div class="step-dot active"></div>
+        </div>
+        <button class="btn btn-primary" onclick="generatePlan()" id="gen-btn">Build my trip →</button>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- GENERATING STATE -->
+  <section id="generating">
+    <div class="gen-ginger">
+      <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=300&q=80" alt="Ginger" />
+    </div>
+    <h2 class="gen-title">Ginger is building<br><em>your plan…</em></h2>
+    <p class="gen-sub">This takes about 30 seconds. She's being thorough.</p>
+    <div class="gen-log" id="gen-log"></div>
+  </section>
+
+  <!-- OUTPUT -->
+  <section id="output">
+
+    <div class="output-header">
+      <h2 class="output-title" id="output-title">
+        Your <em>Tenerife</em> plan<br>is ready.
+      </h2>
+      <div class="output-meta" id="output-meta"></div>
+    </div>
+
+    <!-- Savings bar -->
+    <div class="savings-bar" id="savings-bar"></div>
+
+    <!-- Day cards -->
+    <div class="day-cards" id="day-cards"></div>
+
+    <!-- Ginger's notes -->
+    <div class="ginger-notes">
+      <div class="ginger-notes-header">
+        <div class="ginger-notes-avatar">
+          <img src="https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=120&q=80" alt="Ginger" />
+        </div>
+        <div>
+          <div class="ginger-notes-label">Insider notes</div>
+          <div class="ginger-notes-name">From Ginger's personal playbook</div>
+        </div>
+      </div>
+      <div class="note-list" id="ginger-notes-list"></div>
+    </div>
+
+    <!-- Advisor CTA -->
+    <div class="advisor-cta">
+      <div>
+        <div class="advisor-cta-title">Questions before you go?<br>That's what I'm here for.</div>
+        <p class="advisor-cta-sub">You have 30 days of access to me as your trip advisor. Ask anything — restaurant bookings, packing for the climate, what to skip, what locals actually eat. I'll answer fast.</p>
+        <button class="btn btn-primary" style="margin-top:20px;" onclick="openGingerChat()">
+          Ask Ginger a question →
+        </button>
+      </div>
+      <div class="advisor-days">
+        <span class="advisor-days-num" id="days-remaining">30</span>
+        <div class="advisor-days-lbl">days<br>remaining</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">Dallasite on Tour · Trip Architect</div>
+    <div class="footer-note">A Tru Skool production · plan.dallasiteontour.org</div>
+  </footer>
+
+</div><!-- /wrap -->
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const state = {
+  step: 1,
+  destination: '', origin: '', arrival: '', departure: '',
+  adults: '2', children: '0', tripType: 'leisure', budget: 'mid',
+  interests: [], notes: '', pace: 'balanced',
+  token: new URLSearchParams(location.search).get('t') || 'demo'
+};
+
+const TOTAL_STEPS = 5;
+
+// ── CHIP SELECTION ─────────────────────────────────────────────────────────
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    chip.classList.toggle('selected');
+    const val = chip.dataset.val;
+    if (chip.classList.contains('selected')) {
+      if (!state.interests.includes(val)) state.interests.push(val);
+    } else {
+      state.interests = state.interests.filter(v => v !== val);
+    }
+  });
+});
+
+function selectPace(el) {
+  document.querySelectorAll('.pace-card').forEach(c => c.classList.remove('selected'));
+  el.classList.add('selected');
+  state.pace = el.dataset.pace;
+}
+
+// ── STEP NAVIGATION ────────────────────────────────────────────────────────
+function nextStep(from) {
+  // Collect values
+  if (from === 1) {
+    state.destination = document.getElementById('destination').value.trim();
+    state.arrival     = document.getElementById('arrival').value;
+    state.departure   = document.getElementById('departure').value;
+    state.origin      = document.getElementById('origin').value.trim();
+    if (!state.destination) { alert('Please enter a destination.'); return; }
+  }
+  if (from === 2) {
+    state.adults   = document.getElementById('adults').value;
+    state.children = document.getElementById('children').value;
+    state.tripType = document.getElementById('trip-type').value;
+    state.budget   = document.getElementById('budget').value;
+  }
+  if (from === 3) {
+    state.notes = document.getElementById('special-notes').value.trim();
+  }
+  if (from === 5) return;
+
+  goToStep(from + 1);
+}
+
+function prevStep(from) {
+  if (from <= 1) return;
+  goToStep(from - 1);
+}
+
+function goToStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById(`step-${n}`);
+  if (el) el.classList.add('active');
+  state.step = n;
+
+  // Update progress
+  const pct = ((n - 1) / TOTAL_STEPS) * 100;
+  document.getElementById('progress-fill').style.width = pct + '%';
+
+  // Summary on step 5
+  if (n === 5) buildSummary();
+
+  window.scrollTo({ top: document.getElementById('wizard').offsetTop - 32, behavior: 'smooth' });
+}
+
+// ── SUMMARY ────────────────────────────────────────────────────────────────
+function buildSummary() {
+  const nights = state.arrival && state.departure
+    ? Math.max(1, Math.round((new Date(state.departure) - new Date(state.arrival)) / 86400000))
+    : '?';
+  const budgetLabels = { budget:'Budget conscious', mid:'Mid-range', comfort:'Comfort first', luxury:'Luxury' };
+  const paceLabels   = { slow:'Slow & deep', balanced:'Balanced', packed:'Full send' };
+  const tripLabels   = { leisure:'Leisure', romantic:'Romantic', family:'Family', 'group-friends':'Group of friends', 'solo-adventure':'Solo adventure', 'digital-nomad':'Digital nomad' };
+
+  document.getElementById('summary-block').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+      <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">DESTINATION</div>
+           <div style="font-size:15px;">${state.destination || '—'}</div></div>
+      <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">DATES</div>
+           <div style="font-size:15px;">${state.arrival || '—'} → ${state.departure || '—'} · <span style="color:var(--terr-lt)">${nights} nights</span></div></div>
+      <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">GROUP</div>
+           <div style="font-size:15px;">${state.adults} adults${state.children !== '0' ? ` · ${state.children} children` : ''} · ${tripLabels[state.tripType]}</div></div>
+      <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">BUDGET & PACE</div>
+           <div style="font-size:15px;">${budgetLabels[state.budget]} · ${paceLabels[state.pace]}</div></div>
+      <div style="grid-column:1/-1"><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:8px;">INTERESTS</div>
+           <div style="font-size:14px;color:var(--muted);">${state.interests.length ? state.interests.join(' · ') : 'None selected'}</div></div>
+      ${state.notes ? `<div style="grid-column:1/-1"><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">NOTES</div><div style="font-size:14px;color:var(--muted);">${state.notes}</div></div>` : ''}
+    </div>
+  `;
+}
+
+// ── GENERATE ───────────────────────────────────────────────────────────────
+async function generatePlan() {
+  document.getElementById('wizard').style.display = 'none';
+  document.getElementById('generating').classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  const logs = [
+    'Analyzing destination intelligence…',
+    `Mapping ${state.destination} neighborhoods…`,
+    'Calibrating for your travel pace…',
+    'Sourcing local restaurant picks…',
+    'Building day-by-day routing…',
+    'Checking seasonal conditions…',
+    'Calculating savings opportunities…',
+    'Assembling Ginger\'s insider notes…',
+    'Finalising your plan…',
+  ];
+
+  const logEl = document.getElementById('gen-log');
+  for (let i = 0; i < logs.length; i++) {
+    await delay(320 + Math.random() * 280);
+    const line = document.createElement('div');
+    line.className = 'gen-log-line';
+    line.textContent = `→ ${logs[i]}`;
+    line.style.animationDelay = '0s';
+    logEl.appendChild(line);
+    if (i < logs.length - 1) {
+      await delay(180);
+      line.classList.add('done');
+      line.textContent = `✓ ${logs[i]}`;
+    }
+  }
+
+  // Call Claude API to generate the plan
+  const plan = await callClaude();
+
+  await delay(600);
+  document.getElementById('generating').classList.remove('active');
+  renderOutput(plan);
+}
+
+function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ── CLAUDE API CALL ────────────────────────────────────────────────────────
+async function callClaude() {
+  const nights = state.arrival && state.departure
+    ? Math.max(1, Math.round((new Date(state.departure) - new Date(state.arrival)) / 86400000))
+    : 5;
+
+  const prompt = `You are Ginger Pelirroja, an expert travel advisor specializing in experiential travel.
+
+Build a detailed ${nights}-day trip plan for the following traveler:
+
+DESTINATION: ${state.destination}
+FLYING FROM: ${state.origin || 'unspecified'}
+DATES: ${state.arrival || 'flexible'} to ${state.departure || 'flexible'} (${nights} nights)
+GROUP: ${state.adults} adults, ${state.children} children — ${state.tripType}
+BUDGET: ${state.budget} (budget=<$100/day, mid=$100-250/day, comfort=$250-500/day, luxury=$500+/day per person)
+PACE: ${state.pace} (slow=2-3 activities/day, balanced=4-5, packed=6-7+)
+INTERESTS: ${state.interests.length ? state.interests.join(', ') : 'general travel'}
+SPECIAL NOTES: ${state.notes || 'none'}
+
+Respond ONLY with a JSON object in this exact format (no markdown, no preamble):
+{
+  "destination_display": "short destination name e.g. Tenerife",
+  "tagline": "one evocative line about this trip e.g. 'volcanic coasts, hidden villages, time to exhale'",
+  "nights": ${nights},
+  "savings": {
+    "est_savings_pct": "e.g. 35%",
+    "best_booking_window": "e.g. 6-8 weeks out",
+    "top_hack": "one specific money-saving tip for this destination"
+  },
+  "days": [
+    {
+      "day_num": 1,
+      "title": "evocative day title",
+      "tags": ["e.g. Arrival", "Coast", "Food"],
+      "timeline": [
+        {
+          "time": "e.g. 10:00",
+          "title": "Activity name",
+          "desc": "2-3 sentence description with specific details, real place names, practical tips",
+          "tip": "optional insider tip — specific, practical, not generic"
+        }
+      ]
+    }
+  ],
+  "ginger_notes": [
+    {
+      "icon": "emoji",
+      "text": "specific insider note — must be destination-specific and actionable, not generic"
+    }
+  ]
+}
+
+Rules:
+- Use REAL place names, real neighborhoods, real restaurants where you know them
+- Be specific and opinionated — this is Ginger's personal recommendation, not TripAdvisor
+- Match the budget level: budget travelers get street food + hostels + free hikes; luxury travelers get michelin picks + boutique hotels + private transfers
+- Match the pace: slow = generous downtime built in; packed = early starts, tight scheduling
+- Every day should feel distinct — no copy-paste structure
+- Ginger notes: 5-6 items, each with a specific actionable insight about this exact destination
+- Generate exactly ${Math.min(nights, 7)} days (cap at 7 for readability)`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || '';
+    const clean = text.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch(e) {
+    console.warn('API error, using fallback plan', e);
+    return getFallbackPlan();
+  }
+}
+
+// ── RENDER OUTPUT ──────────────────────────────────────────────────────────
+function renderOutput(plan) {
+  const nights = plan.nights || state.nights || 5;
+
+  // Title
+  document.getElementById('output-title').innerHTML =
+    `Your <em>${plan.destination_display || state.destination}</em><br>plan is ready.`;
+
+  // Tagline + meta
+  document.getElementById('output-meta').innerHTML = `
+    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:var(--terr-lt);margin-bottom:12px;">"${plan.tagline || ''}"</div>
+    <div>${nights} nights · ${state.adults} travellers</div>
+    <div>${state.arrival || 'Flexible dates'}</div>
+  `;
+
+  // Savings bar
+  const s = plan.savings || {};
+  document.getElementById('savings-bar').innerHTML = `
+    <div class="savings-cell"><span class="savings-val">${s.est_savings_pct || '30%'}</span><div class="savings-lbl">EST. SAVINGS</div></div>
+    <div class="savings-cell"><span class="savings-val">${s.best_booking_window || '6–8 wks'}</span><div class="savings-lbl">BEST BOOKING WINDOW</div></div>
+    <div class="savings-cell" style="flex:2;text-align:left;"><span class="savings-val" style="font-size:16px;line-height:1.4;">${s.top_hack || 'Book direct with hotels for best rate.'}</span><div class="savings-lbl">GINGER'S TOP HACK</div></div>
+  `;
+
+  // Day cards
+  const daysEl = document.getElementById('day-cards');
+  daysEl.innerHTML = '';
+  (plan.days || []).forEach((day, idx) => {
+    const card = document.createElement('div');
+    card.className = `day-card${idx === 0 ? ' open' : ''}`;
+    const tags = (day.tags || []).map(t => `<span class="day-tag">${t}</span>`).join('');
+    const timeline = (day.timeline || []).map(item => `
+      <div class="tl-item">
+        <div class="tl-time">${item.time || ''}</div>
+        <div class="tl-content">
+          <div class="tl-title">${item.title || ''}</div>
+          <div class="tl-desc">${item.desc || ''}</div>
+          ${item.tip ? `<span class="tl-tip">💡 ${item.tip}</span>` : ''}
+        </div>
+      </div>
+    `).join('');
+
+    card.innerHTML = `
+      <div class="day-card-header" onclick="toggleDay(this.parentElement)">
+        <div class="day-num">DAY ${day.day_num || idx + 1}</div>
+        <div class="day-label">${day.title || ''}</div>
+        <div class="day-tags">${tags}</div>
+        <div class="day-chevron">▼</div>
+      </div>
+      <div class="day-card-body">
+        <div class="day-timeline">${timeline}</div>
+      </div>
+    `;
+    daysEl.appendChild(card);
+  });
+
+  // Ginger notes
+  const notesEl = document.getElementById('ginger-notes-list');
+  notesEl.innerHTML = (plan.ginger_notes || []).map(n => `
+    <div class="note-item">
+      <div class="note-icon">${n.icon || '📍'}</div>
+      <div class="note-text">${n.text || ''}</div>
+    </div>
+  `).join('');
+
+  // Show output
+  document.getElementById('output').classList.add('active');
+  document.getElementById('output').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function toggleDay(card) {
+  card.classList.toggle('open');
+}
+
+// ── FALLBACK PLAN (if API fails) ───────────────────────────────────────────
+function getFallbackPlan() {
+  return {
+    destination_display: state.destination || "Your Destination",
+    tagline: "A trip built around you, not a template",
+    nights: 5,
+    savings: {
+      est_savings_pct: "30–40%",
+      best_booking_window: "6–8 weeks out",
+      top_hack: "Book flights Tuesday–Wednesday for the lowest fares, and always check the hotel's direct website against booking platforms."
+    },
+    days: [
+      { day_num: 1, title: "Arrival & First Impressions", tags: ["Arrival", "Neighbourhood"],
+        timeline: [
+          { time: "15:00", title: "Check in & settle", desc: "Drop your bags and resist the urge to immediately sightsee. Walk the block around your hotel — this is how you start to feel a place rather than just visit it.", tip: "Ask your host or front desk: 'Where do you eat lunch on a Tuesday?' — not 'what's the best restaurant.'" },
+          { time: "18:00", title: "Neighbourhood aperitivo", desc: "Find the nearest local bar or café and order whatever everyone else is drinking. Watch the street for an hour. This is the most underrated thing you can do on day one.", tip: null },
+          { time: "20:30", title: "First proper dinner", desc: "Keep it simple tonight — somewhere walkable, somewhere with a handwritten menu or a daily special board. Save the big reservation for night three when you know the city better.", tip: null }
+        ]
+      },
+      { day_num: 2, title: "Go Deep, Not Wide", tags: ["Culture", "Food", "Local"],
+        timeline: [
+          { time: "08:30", title: "Morning market", desc: "Every city worth visiting has a morning market that's not on the main tourist map. Ask a local where residents actually shop for produce. It's usually within 15 minutes of anywhere.", tip: "Markets are best before 10am — after that the locals are gone and the prices change." },
+          { time: "11:00", title: "The thing that's actually worth it", desc: "Pick one landmark, museum, or viewpoint that genuinely interests you — not the one everyone photographs. Spend real time there instead of rushing through five things.", tip: null },
+          { time: "14:00", title: "Long lunch", desc: "This is not a rest stop. A two-hour lunch in the right place is the best money you'll spend all trip. Look for places without pictures on the menu.", tip: null },
+          { time: "19:00", title: "Evening wander", desc: "No plan. Just walk in a direction you haven't been. Budget an hour and see what you find.", tip: null }
+        ]
+      }
+    ],
+    ginger_notes: [
+      { icon: "🕐", text: "The best experiences at any destination happen between 7–9am and after 7pm — when the tour groups are eating at their hotel restaurants." },
+      { icon: "💬", text: "Learn three words in the local language: hello, thank you, and 'do you recommend?' People respond differently when you try." },
+      { icon: "📱", text: "Download offline maps before you land. Data plans abroad are cheaper than you think — get a local SIM at the airport." },
+      { icon: "🍽", text: "Price isn't quality. The best meal of your trip will probably cost under $15. The worst might cost $80. Follow noise and locals, not review counts." },
+      { icon: "🎒", text: "Pack one less outfit than you think you need. You'll thank yourself on transit days and in markets where you want to buy things." }
+    ]
+  };
+}
+
+function openGingerChat() {
+  // Trigger the Ginger widget if it's on the parent site, otherwise open chat
+  if (window.GingerChat) window.GingerChat.open();
+  else window.open('https://dallasiteontour.org#chat', '_blank');
+}
+
+// ── SET MIN DATE ───────────────────────────────────────────────────────────
+const today = new Date().toISOString().split('T')[0];
+document.getElementById('arrival').min = today;
+document.getElementById('departure').min = today;
+
+// Fix hero image — try Ginger portrait, fall back to Unsplash
+const heroImg = document.getElementById('hero-img');
+heroImg.onerror = () => { heroImg.src = 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80'; heroImg.onerror = null; };
+heroImg.src = 'https://ugdaqdhthleyhvsubxis.supabase.co/storage/v1/object/public/ginger-clips/../portraits/ginger-portrait.jpg';
+// Immediate fallback if portrait doesn't exist yet
+setTimeout(() => {
+  if (!heroImg.complete || heroImg.naturalHeight === 0) {
+    heroImg.src = 'https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?w=600&q=80';
+  }
+}, 1500);
+</script>
+
+</body>
+</html>
