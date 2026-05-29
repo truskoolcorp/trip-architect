@@ -458,6 +458,7 @@
     footer { flex-direction: column; gap: 12px; text-align: center; }
   }
 </style>
+  <script src="https://elevenlabs.io/convai-widget/index.js" async></script>
 </head>
 
 <body>
@@ -1236,11 +1237,7 @@ function getFallbackPlan() {
   };
 }
 
-function openGingerChat() {
-  // Trigger the Ginger widget if it's on the parent site, otherwise open chat
-  if (window.GingerChat) window.GingerChat.open();
-  else window.open('https://dallasiteontour.org#chat', '_blank');
-}
+// openGingerChat() defined by Ginger Advisor widget below
 
 // ── SET MIN DATE ───────────────────────────────────────────────────────────
 const today = new Date().toISOString().split('T')[0];
@@ -1257,6 +1254,466 @@ setTimeout(() => {
     heroImg.src = 'https://ugdaqdhthleyhvsubxis.supabase.co/storage/v1/object/public/ginger-clips/portraits/ginger-portrait.jpg';
   }
 }, 1500);
+</script>
+
+
+<!-- ============================================================
+     GINGER ADVISOR CHAT WIDGET
+     ElevenLabs ConvAI — Trip Architect post-purchase mode
+     Agent: GINGER_ADVISOR_AGENT_ID (set below)
+     ============================================================ -->
+
+<style>
+  /* ── FAB trigger ── */
+  #ga-fab {
+    position: fixed; bottom: 28px; right: 28px; z-index: 10000;
+    width: 60px; height: 60px; border-radius: 50%;
+    background: linear-gradient(135deg, #C47135, #E8A06A);
+    border: none; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(196,113,53,0.45);
+    transition: transform 0.2s, box-shadow 0.2s;
+    overflow: hidden; padding: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #ga-fab:hover { transform: scale(1.07); box-shadow: 0 6px 28px rgba(196,113,53,0.55); }
+  #ga-fab img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+  #ga-fab-pulse {
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    width: 60px; height: 60px; border-radius: 50%;
+    background: rgba(196,113,53,0.25);
+    animation: ga-pulse 2.2s ease-out infinite;
+    pointer-events: none;
+  }
+  @keyframes ga-pulse {
+    0%   { transform: scale(1);   opacity: 0.7; }
+    100% { transform: scale(1.75); opacity: 0;  }
+  }
+
+  /* ── Panel ── */
+  #ga-panel {
+    position: fixed; bottom: 100px; right: 28px; z-index: 10001;
+    width: 360px; max-height: 580px;
+    background: #1E1812;
+    border: 1px solid rgba(196,113,53,0.25);
+    border-radius: 12px;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+    transform: translateY(16px) scale(0.97);
+    opacity: 0; pointer-events: none;
+    transition: all 0.28s cubic-bezier(0.34,1.56,0.64,1);
+  }
+  #ga-panel.open {
+    transform: translateY(0) scale(1);
+    opacity: 1; pointer-events: all;
+  }
+
+  /* Panel header */
+  #ga-header {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 16px; background: rgba(196,113,53,0.09);
+    border-bottom: 1px solid rgba(196,113,53,0.15); flex-shrink: 0;
+  }
+  #ga-avatar {
+    width: 38px; height: 38px; border-radius: 50%; overflow: hidden;
+    border: 2px solid #C47135; flex-shrink: 0;
+  }
+  #ga-avatar img { width: 100%; height: 100%; object-fit: cover; }
+  #ga-identity { flex: 1; }
+  #ga-name {
+    font-family: 'Cormorant Garamond', serif; font-size: 16px;
+    font-weight: 400; color: #F5EFE6; line-height: 1;
+  }
+  #ga-status {
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.12em; color: #C47135; margin-top: 3px;
+  }
+  #ga-close {
+    background: transparent; border: none; color: #7A6B5E;
+    font-size: 18px; cursor: pointer; padding: 4px;
+    transition: color 0.15s; line-height: 1;
+  }
+  #ga-close:hover { color: #F5EFE6; }
+
+  /* Context pill */
+  #ga-context {
+    padding: 8px 14px; flex-shrink: 0;
+    display: none;
+  }
+  #ga-context-pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(196,113,53,0.1); border: 1px solid rgba(196,113,53,0.2);
+    border-radius: 100px; padding: 5px 12px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.1em; color: #C47135;
+  }
+
+  /* Messages */
+  #ga-messages {
+    flex: 1; overflow-y: auto; padding: 16px;
+    display: flex; flex-direction: column; gap: 10px;
+    min-height: 200px;
+  }
+  #ga-messages::-webkit-scrollbar { width: 4px; }
+  #ga-messages::-webkit-scrollbar-thumb { background: rgba(196,113,53,0.2); border-radius: 2px; }
+
+  .ga-msg {
+    max-width: 85%; padding: 10px 14px;
+    font-size: 14px; line-height: 1.55;
+    font-family: 'DM Sans', sans-serif; font-weight: 300;
+    border-radius: 14px; animation: ga-msgIn 0.2s ease;
+  }
+  @keyframes ga-msgIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .ga-msg.ginger {
+    background: rgba(196,113,53,0.1); color: #EDE4D7;
+    border: 1px solid rgba(196,113,53,0.15);
+    border-bottom-left-radius: 4px; align-self: flex-start;
+  }
+  .ga-msg.user {
+    background: #C47135; color: #1A1410; font-weight: 400;
+    border-bottom-right-radius: 4px; align-self: flex-end;
+  }
+  .ga-msg.system {
+    background: transparent; color: #4A3F38;
+    font-family: 'DM Mono', monospace; font-size: 11px;
+    letter-spacing: 0.08em; text-align: center;
+    align-self: center; border: none; padding: 4px 0;
+  }
+
+  /* Typing indicator */
+  .ga-typing {
+    display: flex; gap: 5px; align-items: center;
+    padding: 12px 14px; align-self: flex-start;
+    background: rgba(196,113,53,0.07);
+    border: 1px solid rgba(196,113,53,0.12);
+    border-radius: 14px 14px 14px 4px;
+  }
+  .ga-typing span {
+    width: 6px; height: 6px; background: #C47135;
+    border-radius: 50%; animation: ga-dot 1.2s ease infinite;
+  }
+  .ga-typing span:nth-child(2) { animation-delay: 0.2s; }
+  .ga-typing span:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes ga-dot {
+    0%,80%,100% { transform: scale(0.6); opacity: 0.4; }
+    40%          { transform: scale(1);   opacity: 1;   }
+  }
+
+  /* Voice indicator */
+  #ga-voice-bar {
+    display: none; align-items: center; justify-content: center;
+    gap: 3px; padding: 12px 0; flex-shrink: 0;
+  }
+  #ga-voice-bar.active { display: flex; }
+  .ga-vbar {
+    width: 3px; background: #C47135; border-radius: 2px;
+    animation: ga-vwave 0.8s ease infinite;
+  }
+  .ga-vbar:nth-child(1) { height: 8px;  animation-delay: 0s;    }
+  .ga-vbar:nth-child(2) { height: 18px; animation-delay: 0.1s;  }
+  .ga-vbar:nth-child(3) { height: 26px; animation-delay: 0.15s; }
+  .ga-vbar:nth-child(4) { height: 18px; animation-delay: 0.2s;  }
+  .ga-vbar:nth-child(5) { height: 10px; animation-delay: 0.25s; }
+  .ga-vbar:nth-child(6) { height: 22px; animation-delay: 0.1s;  }
+  .ga-vbar:nth-child(7) { height: 14px; animation-delay: 0.3s;  }
+  @keyframes ga-vwave {
+    0%,100% { transform: scaleY(0.5); opacity: 0.5; }
+    50%      { transform: scaleY(1.4); opacity: 1;   }
+  }
+
+  /* Input row */
+  #ga-input-row {
+    display: flex; gap: 8px; padding: 12px 14px;
+    border-top: 1px solid rgba(196,113,53,0.12); flex-shrink: 0;
+  }
+  #ga-text-input {
+    flex: 1; background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(196,113,53,0.2); border-radius: 22px;
+    color: #F5EFE6; font-family: 'DM Sans', sans-serif;
+    font-size: 14px; font-weight: 300;
+    padding: 10px 16px; outline: none; transition: border-color 0.2s;
+  }
+  #ga-text-input::placeholder { color: rgba(122,107,94,0.7); }
+  #ga-text-input:focus { border-color: #C47135; }
+  #ga-mic-btn, #ga-send-btn {
+    width: 40px; height: 40px; border-radius: 50%; border: none;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    font-size: 16px; flex-shrink: 0; transition: all 0.18s;
+  }
+  #ga-mic-btn {
+    background: rgba(196,113,53,0.12); color: #C47135;
+    border: 1px solid rgba(196,113,53,0.25);
+  }
+  #ga-mic-btn:hover, #ga-mic-btn.listening { background: #C47135; color: #1A1410; }
+  #ga-send-btn { background: #C47135; color: #1A1410; }
+  #ga-send-btn:hover { background: #E8A06A; }
+
+  /* Disclaimer */
+  #ga-disclaimer {
+    text-align: center; padding: 6px 14px 10px;
+    font-family: 'DM Mono', monospace; font-size: 10px;
+    letter-spacing: 0.08em; color: #3A2F28; flex-shrink: 0;
+  }
+
+  /* Mobile */
+  @media (max-width: 480px) {
+    #ga-panel { right: 12px; left: 12px; width: auto; bottom: 88px; }
+    #ga-fab, #ga-fab-pulse { right: 16px; bottom: 20px; }
+  }
+</style>
+
+<!-- Pulse ring behind FAB -->
+<div id="ga-fab-pulse"></div>
+
+<!-- FAB button -->
+<button id="ga-fab" onclick="GingerAdvisor.toggle()" title="Ask Ginger">
+  <img src="https://ugdaqdhthleyhvsubxis.supabase.co/storage/v1/object/public/ginger-clips/portraits/ginger-portrait.jpg"
+       alt="Ginger" onerror="this.style.display='none';this.parentElement.textContent='💬'" />
+</button>
+
+<!-- Chat panel -->
+<div id="ga-panel">
+  <div id="ga-header">
+    <div id="ga-avatar">
+      <img src="https://ugdaqdhthleyhvsubxis.supabase.co/storage/v1/object/public/ginger-clips/portraits/ginger-portrait.jpg"
+           alt="Ginger" />
+    </div>
+    <div id="ga-identity">
+      <div id="ga-name">Ginger Pelirroja</div>
+      <div id="ga-status">● Trip Advisor · Online</div>
+    </div>
+    <button id="ga-close" onclick="GingerAdvisor.close()">✕</button>
+  </div>
+
+  <div id="ga-context">
+    <div id="ga-context-pill">
+      <span>📍</span>
+      <span id="ga-context-text">No destination set</span>
+    </div>
+  </div>
+
+  <div id="ga-voice-bar">
+    <div class="ga-vbar"></div><div class="ga-vbar"></div>
+    <div class="ga-vbar"></div><div class="ga-vbar"></div>
+    <div class="ga-vbar"></div><div class="ga-vbar"></div>
+    <div class="ga-vbar"></div>
+  </div>
+
+  <div id="ga-messages"></div>
+
+  <div id="ga-input-row">
+    <button id="ga-mic-btn" onclick="GingerAdvisor.toggleMic()" title="Talk to Ginger">🎤</button>
+    <input id="ga-text-input" type="text" placeholder="Ask Ginger anything about your trip…"
+           onkeydown="if(event.key==='Enter')GingerAdvisor.send()" />
+    <button id="ga-send-btn" onclick="GingerAdvisor.send()">➤</button>
+  </div>
+  <div id="ga-disclaimer">Ginger is an AI trip advisor · Powered by ElevenLabs</div>
+</div>
+
+<script>
+// ── GINGER ADVISOR CONFIG ───────────────────────────────────────────────────
+// Replace GINGER_ADVISOR_AGENT_ID with your ElevenLabs agent ID after creating it
+const GA_AGENT_ID = 'GINGER_ADVISOR_AGENT_ID';
+const GA_PORTRAIT = 'https://ugdaqdhthleyhvsubxis.supabase.co/storage/v1/object/public/ginger-clips/portraits/ginger-portrait.jpg';
+
+// ── GINGER ADVISOR WIDGET ───────────────────────────────────────────────────
+const GingerAdvisor = {
+  open: false,
+  conv: null,       // ElevenLabs Conversation instance
+  listening: false,
+  initialized: false,
+
+  toggle() {
+    this.open ? this.close() : this.show();
+  },
+
+  show() {
+    document.getElementById('ga-panel').classList.add('open');
+    document.getElementById('ga-fab-pulse').style.display = 'none';
+    this.open = true;
+    if (!this.initialized) this._init();
+  },
+
+  close() {
+    document.getElementById('ga-panel').classList.remove('open');
+    this.open = false;
+  },
+
+  _init() {
+    this.initialized = true;
+
+    // Show context pill if destination is known
+    const dest = window.state?.destination || '';
+    if (dest) {
+      const dates = window.state?.arrival
+        ? ` · ${window.state.arrival}`
+        : '';
+      document.getElementById('ga-context').style.display = 'block';
+      document.getElementById('ga-context-text').textContent = dest + dates;
+    }
+
+    // Opening message
+    const destGreet = dest
+      ? `You've got your ${dest} plan — what questions do you have before you go?`
+      : `You've got your plan — what questions do you have before you go?`;
+
+    this._addMsg('ginger', destGreet);
+
+    // If ElevenLabs ConvAI SDK loaded, initialize voice
+    if (typeof ElevenLabsConvai !== 'undefined' && GA_AGENT_ID !== 'GINGER_ADVISOR_AGENT_ID') {
+      this._initVoice();
+    } else {
+      // Text-only mode (agent ID not set yet or SDK not loaded)
+      this._addMsg('system', 'TEXT MODE · Voice available once agent is configured');
+    }
+  },
+
+  async _initVoice() {
+    try {
+      // Build dynamic variables to give Ginger trip context
+      const dynamicVars = {
+        destination:  window.state?.destination  || 'unknown',
+        arrival:      window.state?.arrival      || 'flexible',
+        departure:    window.state?.departure    || 'flexible',
+        adults:       window.state?.adults       || '2',
+        budget:       window.state?.budget       || 'mid',
+        interests:    (window.state?.interests || []).join(', ') || 'general travel',
+        pace:         window.state?.pace         || 'balanced',
+        buyer_email:  window._buyerEmail         || '',
+      };
+
+      this.conv = await ElevenLabsConvai.startSession({
+        agentId: GA_AGENT_ID,
+        dynamicVariables,
+        onMessage: (msg) => {
+          if (msg.source === 'ai') {
+            this._removeTyping();
+            this._addMsg('ginger', msg.message);
+          }
+        },
+        onStatusChange: (status) => {
+          const statusEl = document.getElementById('ga-status');
+          const voiceBar = document.getElementById('ga-voice-bar');
+          if (status === 'listening') {
+            statusEl.textContent = '● Listening…';
+            voiceBar.classList.add('active');
+            document.getElementById('ga-mic-btn').classList.add('listening');
+          } else if (status === 'speaking') {
+            statusEl.textContent = '● Speaking…';
+            voiceBar.classList.add('active');
+            document.getElementById('ga-mic-btn').classList.remove('listening');
+          } else {
+            statusEl.textContent = '● Trip Advisor · Online';
+            voiceBar.classList.remove('active');
+            document.getElementById('ga-mic-btn').classList.remove('listening');
+          }
+        },
+        onError: (err) => {
+          console.warn('ElevenLabs ConvAI error:', err);
+          this._addMsg('system', 'Voice unavailable · use text below');
+        }
+      });
+
+      document.getElementById('ga-status').textContent = '● Voice ready';
+    } catch(e) {
+      console.warn('ConvAI init failed:', e);
+    }
+  },
+
+  async send() {
+    const input = document.getElementById('ga-text-input');
+    const text  = input.value.trim();
+    if (!text) return;
+    input.value = '';
+
+    this._addMsg('user', text);
+    this._addTyping();
+
+    // If voice session active, send via ConvAI
+    if (this.conv) {
+      try {
+        await this.conv.sendText(text);
+        return;
+      } catch(e) {
+        console.warn('ConvAI send failed, falling back to Claude API');
+      }
+    }
+
+    // Text fallback — call Claude API directly
+    try {
+      const dest = window.state?.destination || 'their destination';
+      const systemPrompt = `You are Ginger Pelirroja, a warm, confident, and highly knowledgeable travel advisor. 
+The user has purchased the $97 Trip Architect and built a custom trip plan for ${dest}.
+They are asking post-purchase trip-prep questions. Be specific, practical, and personal.
+Answer in 2-4 sentences max. Never be generic. Use real place knowledge where possible.
+DO NOT sell anything. This person has already paid. Just help them have the best trip possible.
+Their trip context: destination=${dest}, arrival=${window.state?.arrival||'?'}, 
+adults=${window.state?.adults||'2'}, budget=${window.state?.budget||'mid'}, 
+interests=${(window.state?.interests||[]).join(', ')||'general'}, pace=${window.state?.pace||'balanced'}.`;
+
+      const resp = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          system: systemPrompt,
+          messages: [{ role: 'user', content: text }]
+        })
+      });
+      const data = await resp.json();
+      this._removeTyping();
+      this._addMsg('ginger', data.content?.[0]?.text || "I'm having trouble connecting right now. Try again in a moment.");
+    } catch(e) {
+      this._removeTyping();
+      this._addMsg('ginger', "Something went wrong on my end. Try asking again.");
+    }
+  },
+
+  toggleMic() {
+    if (!this.conv) {
+      this._addMsg('system', 'Set up your ElevenLabs agent to enable voice');
+      return;
+    }
+    if (this.listening) {
+      this.conv.endSession();
+      this.listening = false;
+    } else {
+      this.listening = true;
+    }
+  },
+
+  _addMsg(role, text) {
+    const msgs = document.getElementById('ga-messages');
+    const div  = document.createElement('div');
+    div.className = `ga-msg ${role}`;
+    div.textContent = text;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  },
+
+  _addTyping() {
+    const msgs = document.getElementById('ga-messages');
+    const div  = document.createElement('div');
+    div.className = 'ga-typing'; div.id = 'ga-typing';
+    div.innerHTML = '<span></span><span></span><span></span>';
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  },
+
+  _removeTyping() {
+    document.getElementById('ga-typing')?.remove();
+  }
+};
+
+// Wire the main page CTA
+function openGingerChat() {
+  GingerAdvisor.show();
+  document.getElementById('ga-panel').scrollIntoView({ behavior: 'smooth', block: 'end' });
+}
 </script>
 
 </body>
