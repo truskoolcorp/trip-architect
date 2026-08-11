@@ -1,0 +1,21 @@
+name: Production hardening
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/scripts/production-hardening.py'
+      - '.github/workflows/production-hardening.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 .github/scripts/production-hardening.py
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "fix: harden paid access and repair advisor script"
+          git push
