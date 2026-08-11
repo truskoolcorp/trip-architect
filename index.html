@@ -814,7 +814,10 @@ const SUPABASE_URL  = 'https://ugdaqdhthleyhvsubxis.supabase.co';
 const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnZGFxZGh0aGxleWh2c3VieGlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzI1ODUsImV4cCI6MjA4NTc0ODU4NX0.VlHoUXozjiDZYS7-d9n_cdGMsJKB61rPK-2d9tHQtV4';
 
 const urlToken = new URLSearchParams(location.search).get('t');
-const DEMO_MODE = !urlToken || urlToken === 'demo';
+// Production is fail-closed. Demo access must be explicitly requested and is
+// limited to local/preview hosts so the public production URL cannot bypass payment.
+const IS_LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(location.hostname) || location.hostname.endsWith('.vercel.app');
+const DEMO_MODE = urlToken === 'demo' && IS_LOCAL_PREVIEW;
 
 async function validateToken(t) {
   if (DEMO_MODE) return { valid: true, demo: true, email: null, expires_at: null };
@@ -831,7 +834,7 @@ async function validateToken(t) {
     return { valid: true, demo: false, email: row.email, expires_at: row.expires_at, id: row.id };
   } catch(e) {
     console.warn('Token validation error:', e);
-    return { valid: true, demo: true }; // fail open so network issues don't break access
+    return { valid: false, reason: 'validation_error' }; // fail closed: paid access must be verifiable
   }
 }
 
@@ -1573,8 +1576,6 @@ const GingerAdvisor = {
       document.getElementById('ga-input-row').style.display  = 'flex';
     }
   },
-
-  async send
 
   async send() {
     const input = document.getElementById('ga-text-input');
