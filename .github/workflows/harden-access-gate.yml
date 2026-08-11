@@ -1,0 +1,46 @@
+name: Harden Trip Architect access gate
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harden paid access gate
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old="""const urlToken = new URLSearchParams(location.search).get('t');
+const DEMO_MODE = !urlToken || urlToken === 'demo';"""
+          new="""const urlToken = new URLSearchParams(location.search).get('t');
+// Production is fail-closed. Demo access must be explicitly requested and is
+// limited to local/preview hosts so the public production URL cannot bypass payment.
+const IS_LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(location.hostname) || location.hostname.endsWith('.vercel.app');
+const DEMO_MODE = urlToken === 'demo' && IS_LOCAL_PREVIEW;"""
+          if old not in s: raise SystemExit('token mode block not found')
+          s=s.replace(old,new,1)
+          old2="""  } catch(e) {
+    console.warn('Token validation error:', e);
+    return { valid: true, demo: true }; // fail open so network issues don't break access
+  }
+}"""
+          new2="""  } catch(e) {
+    console.warn('Token validation error:', e);
+    return { valid: false, reason: 'validation_error' }; // fail closed: paid access must be verifiable
+  }
+}"""
+          if old2 not in s: raise SystemExit('fail-open block not found')
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git diff --cached --quiet || git commit -m "fix: fail closed on Trip Architect paid access"
+          git push
