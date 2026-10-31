@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta name="referrer" content="no-referrer">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trip Architect · Dallasite on Tour</title>
@@ -811,48 +812,18 @@
 
 // ── TOKEN GATE ─────────────────────────────────────────────────────────────
 const SUPABASE_URL  = 'https://ugdaqdhthleyhvsubxis.supabase.co';
-const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVnZGFxZGh0aGxleWh2c3VieGlzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAxNzI1ODUsImV4cCI6MjA4NTc0ODU4NX0.VlHoUXozjiDZYS7-d9n_cdGMsJKB61rPK-2d9tHQtV4';
-
 const urlToken = new URLSearchParams(location.search).get('t');
-// Production is fail-closed. Demo access must be explicitly requested and is
-// limited to local/preview hosts so the public production URL cannot bypass payment.
-const IS_LOCAL_PREVIEW = ['localhost', '127.0.0.1'].includes(location.hostname) || location.hostname.endsWith('.vercel.app');
-const DEMO_MODE = urlToken === 'demo' && IS_LOCAL_PREVIEW;
-
+// Access is verified by the server; preview hosts cannot bypass paid access.
+const DEMO_MODE = false;
 async function validateToken(t) {
-  if (DEMO_MODE) return { valid: true, demo: true, email: null, expires_at: null };
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/architect_sessions?token=eq.${encodeURIComponent(t)}&select=id,email,expires_at,status,use_count`,
-      { headers: { 'apikey': SUPABASE_ANON, 'Authorization': `Bearer ${SUPABASE_ANON}` } }
-    );
-    const rows = await res.json();
-    if (!rows || rows.length === 0) return { valid: false };
-    const row = rows[0];
-    if (row.status !== 'active') return { valid: false, reason: 'expired' };
-    if (new Date(row.expires_at) < new Date()) return { valid: false, reason: 'expired' };
-    return { valid: true, demo: false, email: row.email, expires_at: row.expires_at, id: row.id };
-  } catch(e) {
-    console.warn('Token validation error:', e);
-    return { valid: false, reason: 'validation_error' }; // fail closed: paid access must be verifiable
-  }
-}
-
-async function trackUsage(sessionId) {
-  if (!sessionId) return;
-  await fetch(
-    `${SUPABASE_URL}/rest/v1/architect_sessions?id=eq.${sessionId}`,
-    {
-      method: 'PATCH',
-      headers: {
-        'apikey': SUPABASE_ANON,
-        'Authorization': `Bearer ${SUPABASE_ANON}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=minimal'
-      },
-      body: JSON.stringify({ last_used_at: new Date().toISOString(), use_count: undefined })
-    }
-  );
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/architect-access`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({token:t})
+    });
+    if (!res.ok) return {valid:false,reason:res.status===503?'validation_error':'no_token'};
+    return await res.json();
+  } catch { return {valid:false,reason:'validation_error'}; }
 }
 
 function showGate(reason) {
@@ -868,10 +839,10 @@ function showGate(reason) {
             ? 'Your 30-day Trip Architect access has ended. Purchase again to build a new plan.'
             : 'This experience is included with the $97 Trip Architect purchase. Your personalised access link is in your confirmation email.'}
         </p>
-        <a href="https://dallasiteontour.org" style="display:inline-block;background:#C47135;color:#1A1410;font-size:14px;font-weight:500;padding:13px 28px;border-radius:3px;text-decoration:none;margin-right:10px;">
+        <a href="https://www.dallasiteontour.org" style="display:inline-block;background:#C47135;color:#1A1410;font-size:14px;font-weight:500;padding:13px 28px;border-radius:3px;text-decoration:none;margin-right:10px;">
           Get Trip Architect →
         </a>
-        <a href="https://dallasiteontour.org" style="display:inline-block;border:1px solid rgba(196,113,53,0.3);color:#7A6B5E;font-size:14px;padding:13px 28px;border-radius:3px;text-decoration:none;">
+        <a href="https://www.dallasiteontour.org" style="display:inline-block;border:1px solid rgba(196,113,53,0.3);color:#7A6B5E;font-size:14px;padding:13px 28px;border-radius:3px;text-decoration:none;">
           Back to site
         </a>
       </div>
@@ -898,10 +869,9 @@ function showDemoBanner(daysLeft) {
   if (!result.demo && result.expires_at) {
     const daysLeft = Math.ceil((new Date(result.expires_at) - new Date()) / 86400000);
     showDemoBanner(daysLeft);
-    trackUsage(result.id);
   }
   // Make buyer email available to the app
-  window._buyerEmail = result.email;
+  // No buyer email or database session identifier is exposed to the browser.
 })();
 
 // ── STATE ──────────────────────────────────────────────────────────────────
@@ -988,9 +958,17 @@ function goToStep(n) {
 }
 
 // ── SUMMARY ────────────────────────────────────────────────────────────────
+function escapeDisplay(value) {
+  if (typeof value === 'string') return value.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  if (Array.isArray(value)) return value.map(escapeDisplay);
+  if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k,v]) => [k,escapeDisplay(v)]));
+  return value;
+}
+
 function buildSummary() {
-  const nights = state.arrival && state.departure
-    ? Math.max(1, Math.round((new Date(state.departure) - new Date(state.arrival)) / 86400000))
+  const displayState = escapeDisplay(state);
+  const nights = displayState.arrival && displayState.departure
+    ? Math.max(1, Math.round((new Date(displayState.departure) - new Date(displayState.arrival)) / 86400000))
     : '?';
   const budgetLabels = { budget:'Budget conscious', mid:'Mid-range', comfort:'Comfort first', luxury:'Luxury' };
   const paceLabels   = { slow:'Slow & deep', balanced:'Balanced', packed:'Full send' };
@@ -999,16 +977,16 @@ function buildSummary() {
   document.getElementById('summary-block').innerHTML = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
       <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">DESTINATION</div>
-           <div style="font-size:15px;">${state.destination || '—'}</div></div>
+           <div style="font-size:15px;">${displayState.destination || '—'}</div></div>
       <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">DATES</div>
-           <div style="font-size:15px;">${state.arrival || '—'} → ${state.departure || '—'} · <span style="color:var(--terr-lt)">${nights} nights</span></div></div>
+           <div style="font-size:15px;">${displayState.arrival || '—'} → ${displayState.departure || '—'} · <span style="color:var(--terr-lt)">${nights} nights</span></div></div>
       <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">GROUP</div>
-           <div style="font-size:15px;">${state.adults} adults${state.children !== '0' ? ` · ${state.children} children` : ''} · ${tripLabels[state.tripType]}</div></div>
+           <div style="font-size:15px;">${displayState.adults} adults${displayState.children !== '0' ? ` · ${displayState.children} children` : ''} · ${tripLabels[displayState.tripType]}</div></div>
       <div><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">BUDGET & PACE</div>
-           <div style="font-size:15px;">${budgetLabels[state.budget]} · ${paceLabels[state.pace]}</div></div>
+           <div style="font-size:15px;">${budgetLabels[displayState.budget]} · ${paceLabels[displayState.pace]}</div></div>
       <div style="grid-column:1/-1"><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:8px;">INTERESTS</div>
-           <div style="font-size:14px;color:var(--muted);">${state.interests.length ? state.interests.join(' · ') : 'None selected'}</div></div>
-      ${state.notes ? `<div style="grid-column:1/-1"><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">NOTES</div><div style="font-size:14px;color:var(--muted);">${state.notes}</div></div>` : ''}
+           <div style="font-size:14px;color:var(--muted);">${displayState.interests.length ? displayState.interests.join(' · ') : 'None selected'}</div></div>
+      ${displayState.notes ? `<div style="grid-column:1/-1"><div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:0.14em;color:var(--muted);margin-bottom:6px;">NOTES</div><div style="font-size:14px;color:var(--muted);">${displayState.notes}</div></div>` : ''}
     </div>
   `;
 }
@@ -1047,55 +1025,50 @@ async function generatePlan() {
   }
 
   // Call Claude API to generate the plan
-  const plan = await callClaude();
-
-  await delay(600);
-  document.getElementById('generating').classList.remove('active');
-  renderOutput(plan);
+  try {
+    const plan = await callClaude();
+    document.getElementById('generating').classList.remove('active');
+    renderOutput(plan);
+  } catch {
+    document.getElementById('generating').classList.remove('active');
+    document.getElementById('wizard').style.display = '';
+    let error = document.getElementById('generation-error');
+    if (!error) { error = document.createElement('p'); error.id = 'generation-error'; error.setAttribute('role','alert'); document.getElementById('wizard').prepend(error); }
+    error.textContent = 'Your plan could not be generated. Please check your access link and try again, or contact concierge@truskool.net.';
+  }
 }
 
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── PLAN GENERATION — via Supabase Edge Function ──────────────────────────
 async function callClaude() {
-  try {
-    const resp = await fetch(
-      'https://ugdaqdhthleyhvsubxis.supabase.co/functions/v1/trip-plan-generate',
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ state })
-      }
-    );
-    if (!resp.ok) {
-      console.error('Edge function error:', resp.status, await resp.text());
-      return getFallbackPlan();
-    }
-    const plan = await resp.json();
-    if (plan.error) { console.error('Plan error:', plan.error); return getFallbackPlan(); }
-    return plan;
-  } catch(e) {
-    console.warn('Plan generation failed, using fallback:', e);
-    return getFallbackPlan();
-  }
+  const resp = await fetch(`${SUPABASE_URL}/functions/v1/trip-plan-generate`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({state})
+  });
+  if (!resp.ok) throw new Error('Plan unavailable');
+  const plan = await resp.json();
+  if (!plan || plan.error || !Array.isArray(plan.days)) throw new Error('Plan unavailable');
+  return plan;
 }
 
 // ── RENDER OUTPUT ──────────────────────────────────────────────────────────
 function renderOutput(plan) {
-  const nights = state.nights || plan.nights || 5;
+  plan = escapeDisplay(plan);
+  const displayState = escapeDisplay(state);
+  const nights = displayState.nights || plan.nights || 5;
 
   // Title
   document.getElementById('output-title').innerHTML =
-    `Your <em>${plan.destination_display || state.destination}</em><br>plan is ready.`;
+    `Your <em>${plan.destination_display || displayState.destination}</em><br>plan is ready.`;
 
   // Tagline + meta
-  const actualNights = state.nights || nights;
+  const actualNights = displayState.nights || nights;
   const nightsLabel = actualNights === 1 ? '1 night' : `${actualNights} nights`;
-  const travellerLabel = parseInt(state.adults) === 1 ? '1 traveller' : `${state.adults} travellers`;
+  const travellerLabel = parseInt(displayState.adults) === 1 ? '1 traveller' : `${displayState.adults} travellers`;
   document.getElementById('output-meta').innerHTML = `
     <div style="font-family:'Cormorant Garamond',serif;font-style:italic;font-size:15px;color:var(--terr-lt);margin-bottom:12px;">"${plan.tagline || ''}"</div>
     <div>${nightsLabel} · ${travellerLabel}</div>
-    <div>${state.arrival ? state.arrival + ' → ' + (state.departure || '?') : 'Flexible dates'}</div>
+    <div>${displayState.arrival ? displayState.arrival + ' → ' + (displayState.departure || '?') : 'Flexible dates'}</div>
   `;
 
   // Savings bar
@@ -1613,7 +1586,7 @@ interests=${(window.state?.interests||[]).join(', ')||'general'}, pace=${window.
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ state: window.state, question: text })
+          body: JSON.stringify({ state, question: text })
         }
       );
       const data = await resp.json();
@@ -1676,7 +1649,7 @@ function openGingerChat() {
   <div style="max-width:1180px;margin:0 auto;display:flex;flex-wrap:wrap;gap:14px 24px;align-items:center;justify-content:space-between;">
     <div style="font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#E8A06A;">Dallasite on Tour Network</div>
     <nav aria-label="Dallasite on Tour network" style="display:flex;flex-wrap:wrap;gap:16px;font-size:13px;">
-      <a href="https://dallasiteontour.org" style="color:inherit;text-decoration:none;">Dallasite on Tour</a>
+      <a href="https://www.dallasiteontour.org" style="color:inherit;text-decoration:none;">Dallasite on Tour</a>
       <a href="https://passport.dallasiteontour.org" style="color:inherit;text-decoration:none;">Passport</a>
       <a href="https://canaryspanish.dallasiteontour.org" style="color:inherit;text-decoration:none;">Canary Spanish</a>
       <a href="https://wanderlustfashionstore.com" style="color:inherit;text-decoration:none;">Wanderlust™</a>
@@ -1686,3 +1659,4 @@ function openGingerChat() {
 
 </body>
 </html>
+
